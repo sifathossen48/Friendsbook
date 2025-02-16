@@ -1,11 +1,19 @@
+from datetime import timedelta
+from django.utils import timezone
 from django.shortcuts import render
 from django.contrib.auth.models import User
 from rest_framework import generics, status, permissions
 from rest_framework.views import APIView
+from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
+from rest_framework.filters import OrderingFilter
 from rest_framework.exceptions import NotFound
+from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import authenticate
+from django.db.models import Q
+from user_management import models
+from user_management.filters import MatchingFilter, UsersFilter
 from user_management.models import Registration
 from user_management.serializers import RegistrationSerializer
 
@@ -15,10 +23,16 @@ class UserRegistrationView(generics.CreateAPIView):
     serializer_class = RegistrationSerializer  
     
     def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        
+        if serializer.is_valid():
+            # Save user registration data in the database
+            serializer.save()
         response_data = {
             "message": "User registration successful!",
             
         }
+        
         return Response(response_data, status=status.HTTP_201_CREATED)
     
 class UserProfileView(generics.RetrieveAPIView):
@@ -88,3 +102,122 @@ class LogoutView(APIView):
             return Response({"message": "Successfully logged out!"}, status=200)
         except Exception as e:
             return Response({"error": str(e)}, status=400)
+
+@api_view(["GET"])
+def country_list(request):
+    countries = Registration.objects.values_list("country", flat=True).distinct()
+    return Response({"countries": list(countries)})
+
+class UsersByCountryView(generics.ListAPIView):
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = RegistrationSerializer
+    filter_backends = (DjangoFilterBackend,)
+    filterset_class = UsersFilter  # Apply the custom filter here
+
+    def get_queryset(self):
+        country = self.request.query_params.get('country', None)
+        
+        
+        # Get the logged-in user's gender
+        user_gender = self.request.user.profile.gender 
+        if not country:
+            opposite_gender = 'female' if user_gender == 'male' else 'male'
+            return Registration.objects.filter(gender=opposite_gender)  
+        
+        opposite_gender = 'female' if user_gender == 'male' else 'male'
+        
+        # Filter by country and the opposite gender
+        return Registration.objects.filter(country__iexact=country, gender=opposite_gender)
+
+class MatchingUsersView(generics.ListAPIView):
+    serializer_class = RegistrationSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    queryset = Registration.objects.all()
+    filter_backends = [DjangoFilterBackend]
+    filterset_class = MatchingFilter
+
+    def get_queryset(self):
+        user = self.request.user
+
+        try:
+            user_profile = user.profile
+        except Registration.DoesNotExist:
+            return Registration.objects.none()
+
+        # Get the user's country and address
+        user_country = user_profile.country
+        user_address = user_profile.address
+
+        # Filter users by country (excluding the current user)
+        queryset = Registration.objects.filter(country=user_country).exclude(user=user)
+
+        # Optionally, filter users by partial address match
+        if user_address:
+            queryset = queryset.filter(address__icontains=user_address[:5])  # Matching partial address
+
+        return queryset
+
+
+class JustJoinedUsersView(generics.ListAPIView):
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = RegistrationSerializer
+
+    def get_queryset(self):
+        user = self.request.user
+        user_gender = user.profile.gender
+        opposite_gender = 'female' if user_gender == 'male' else 'male'
+
+        # Filter by opposite gender and order by join_date in descending order
+        return Registration.objects.filter(gender=opposite_gender).order_by('-id')
+
+
+class PreferredEducationMatchView(generics.ListAPIView):
+    permission_classes = [permissions.IsAuthenticated] 
+    serializer_class = RegistrationSerializer
+
+    def get_queryset(self):
+        user = self.request.user
+        # Get the user's Registration profile
+        try:
+            user_profile = user.profile  # Fetch the OneToOne related Registration object
+        except Registration.DoesNotExist:
+            return Registration.objects.none()  # Return empty queryset if profile is missing
+
+        # Ensure user has gender and preferred education
+        if not user_profile.gender or not user_profile.preferred_education:
+            return Registration.objects.none()
+
+        opposite_gender = 'female' if user_profile.gender.lower() == 'male' else 'male'
+
+        # Filter opposite gender users whose education matches the user's preferred education
+        matched_users = Registration.objects.filter(
+            gender=opposite_gender,
+            education=user_profile.preferred_education
+        ).order_by('-id')  # Order by most recent first
+
+        return matched_users
+    
+class PreferredLocationMatchView(generics.ListAPIView):
+    permission_classes = [permissions.IsAuthenticated]  
+    serializer_class = RegistrationSerializer
+
+    def get_queryset(self):
+        user = self.request.user
+        # Get the user's Registration profile
+        try:
+            user_profile = user.profile  # Fetch the OneToOne related Registration object
+        except Registration.DoesNotExist:
+            return Registration.objects.none()  # Return empty queryset if profile is missing
+
+        # Ensure user has gender and preferred education
+        if not user_profile.gender or not user_profile.preferred_location:
+            return Registration.objects.none()
+
+        opposite_gender = 'female' if user_profile.gender.lower() == 'male' else 'male'
+
+        matched_users = Registration.objects.filter(
+            gender=opposite_gender,
+            address=user_profile.preferred_location
+        ).order_by('-id')  # Order by most recent first
+        return matched_users
+

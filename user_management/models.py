@@ -32,11 +32,12 @@ class Registration(models.Model):
     education = models.CharField(max_length=255)
     preferred_education = models.CharField(max_length=255, null=True, blank=True)
     country = models.CharField(max_length=255)
-    address = models.TextField()
+    address = models.CharField(max_length=50)
     preferred_location = models.CharField(max_length=255, null=True, blank=True)
     phone_number = models.CharField(max_length=20)
     language = models.CharField(max_length=255)
     religion = models.CharField(max_length=255)
+    join_date = models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return self.name
