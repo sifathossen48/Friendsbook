@@ -1,8 +1,6 @@
-
 from django.contrib import admin
 from django.urls import path, include
-
-from user_management.views import JustJoinedUsersView, LoginView, LogoutView,PreferredEducationMatchView, PreferredLocationMatchView, UserProfileUpdateView, UserRegistrationView, UserProfileView, UsersByCountryView, country_list, MatchingUsersView
+from user_management.views import ConversationView, JustJoinedUsersView, LoginView, LogoutView, MessageListView,PreferredEducationMatchView, PreferredLocationMatchView, SendMessageView, UserMessageListView,  UserProfileUpdateView, UserRegistrationView, UserProfileView, UsersByCountryView, UsersIMessagedView, country_list, MatchingUsersView
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
 urlpatterns = [
@@ -20,5 +18,11 @@ urlpatterns = [
     path('just_joined/', JustJoinedUsersView.as_view(), name='just_joined_users'),
     path('preferred/education/', PreferredEducationMatchView.as_view(), name='preferred-education'),
     path('preferred/location/', PreferredLocationMatchView.as_view(), name='preferred-location'),
+    path('messages/', MessageListView.as_view(), name='message-list'),
+    path('send-message/<int:receiver_id>', SendMessageView.as_view(), name='send-message'),
+    path('conversation/<str:username>/', ConversationView.as_view(), name='conversation'),
+    path('users/messaged-me/', UserMessageListView.as_view(), name='users-messaged-me'),
+    path('users/i-messaged/', UsersIMessagedView.as_view(), name='users-i-messaged'),
+  
     # path('auth/', include('rest_framework.urls'))
 ]

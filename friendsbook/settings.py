@@ -32,8 +32,17 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt',
     'rest_framework.authtoken',
     'rest_framework_simplejwt.token_blacklist', 
+    'channels',
     'user_management'
 ]
+
+ASGI_APPLICATION = 'friendsbook.asgi.application'
+
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels.layers.InMemoryChannelLayer",  # No Redis
+    },
+}
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',

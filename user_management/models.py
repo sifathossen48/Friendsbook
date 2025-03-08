@@ -41,3 +41,15 @@ class Registration(models.Model):
 
     def __str__(self):
         return self.name
+
+class Message(models.Model):
+    sender = models.ForeignKey(User, on_delete=models.CASCADE, related_name="sent_messages")
+    receiver = models.ForeignKey(User, on_delete=models.CASCADE, related_name="received_messages")
+    message = models.TextField()
+    timestamp = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        # Access the sender and receiver's full names from the linked Registration model
+        sender_name = self.sender.profile.name  # Assuming the related name for Registration is 'profile'
+        receiver_name = self.receiver.profile.name
+        return f"{sender_name} -> {receiver_name}: {self.message}"

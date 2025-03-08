@@ -14,8 +14,9 @@ from django.contrib.auth import authenticate
 from django.db.models import Q
 from user_management import models
 from user_management.filters import MatchingFilter, UsersFilter
-from user_management.models import Registration
-from user_management.serializers import RegistrationSerializer
+
+from user_management.models import Message, Registration
+from user_management.serializers import MessageSerializer, RegistrationSerializer
 
 
 # Create your views here.
@@ -221,3 +222,89 @@ class PreferredLocationMatchView(generics.ListAPIView):
         ).order_by('-id')  # Order by most recent first
         return matched_users
 
+class MessageListView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, *args, **kwargs):
+        receiver = request.user
+        messages = Message.objects.filter(receiver=receiver).order_by('timestamp')
+        serializer = MessageSerializer(messages, many=True)
+        return Response(serializer.data)
+    
+
+
+class SendMessageView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        # Fetch logged-in user (sender)
+        sender = request.user
+        receiver_id = kwargs['receiver_id']
+
+        # Ensure that receiver exists
+        try:
+            receiver = User.objects.get(id=receiver_id)
+        except User.DoesNotExist:
+            return Response({"error": "Receiver not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        # Get the message content from the request data
+        message_content = request.data.get('message')
+
+        if not message_content:
+            return Response({'message': 'Message content is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Save the message in the database
+        message = Message.objects.create(
+            sender=sender,
+            receiver=receiver,
+            message=message_content
+        )
+
+        return Response({'message': 'Message sent successfully'}, status=status.HTTP_201_CREATED)
+
+class ConversationView(generics.ListAPIView):
+    serializer_class = MessageSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        current_user = self.request.user
+        username = self.kwargs.get('username')
+
+        try:
+            receiver = Registration.objects.get(user__username=username)
+        except Registration.DoesNotExist:
+            raise NotFound(detail="User not found")
+
+        messages = Message.objects.filter(
+            Q(sender=current_user, receiver=receiver.user) |
+            Q(sender=receiver.user, receiver=current_user)
+        ).order_by('timestamp')
+
+        if not messages.exists():
+            raise NotFound(detail="No conversation found with this user")
+
+        return messages
+
+class UserMessageListView(generics.ListAPIView):
+    serializer_class = RegistrationSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        current_user = self.request.user
+
+        senders = Message.objects.filter(receiver=current_user).values_list('sender', flat=True).distinct()
+        
+        users = Registration.objects.filter(user__in=senders)
+        return users
+
+class UsersIMessagedView(generics.ListAPIView):
+    serializer_class = RegistrationSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        current_user = self.request.user
+        
+        receivers = Message.objects.filter(sender=current_user).values_list('receiver', flat=True).distinct()
+
+        users = Registration.objects.filter(user__in=receivers)
+        return users
