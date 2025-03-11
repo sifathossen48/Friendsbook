@@ -53,3 +53,25 @@ class Message(models.Model):
         sender_name = self.sender.profile.name  # Assuming the related name for Registration is 'profile'
         receiver_name = self.receiver.profile.name
         return f"{sender_name} -> {receiver_name}: {self.message}"
+
+class Interest(models.Model):
+    PENDING = 'pending'
+    ACCEPTED = 'accepted'
+    REJECTED = 'rejected'
+
+    STATUS_CHOICES = [
+        (PENDING, 'Pending'),
+        (ACCEPTED, 'Accepted'),
+        (REJECTED, 'Rejected'),
+    ]
+
+    sender = models.ForeignKey(User, related_name='interests_sent', on_delete=models.CASCADE)
+    receiver = models.ForeignKey(User, related_name='interests_received', on_delete=models.CASCADE)
+    created_at = models.DateTimeField(auto_now_add=True)
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default=PENDING)
+
+    class Meta:
+        unique_together = ('sender', 'receiver')  # Ensure a user can only send interest to another user once
+
+    def __str__(self):
+        return f"{self.sender.username} interested in {self.receiver.username}, Status: {self.get_status_display()}"

@@ -15,8 +15,8 @@ from django.db.models import Q
 from user_management import models
 from user_management.filters import MatchingFilter, UsersFilter
 
-from user_management.models import Message, Registration
-from user_management.serializers import MessageSerializer, RegistrationSerializer
+from user_management.models import Interest, Message, Registration
+from user_management.serializers import InterestSerializer, MessageSerializer, RegistrationSerializer
 
 
 # Create your views here.
@@ -308,3 +308,66 @@ class UsersIMessagedView(generics.ListAPIView):
 
         users = Registration.objects.filter(user__in=receivers)
         return users
+
+class SendInterestView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, username):
+        current_user = request.user
+        
+        # Check if the receiver exists
+        try:
+            receiver = User.objects.get(username=username)
+        except User.DoesNotExist:
+            raise NotFound(detail="User not found")
+
+        # Check if the current user is not trying to express interest in themselves
+        if current_user == receiver:
+            return Response({"detail": "You cannot express interest in yourself."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Create the interest
+        interest = Interest.objects.create(sender=current_user, receiver=receiver)
+
+        # Optionally, you can serialize the interest data and return it as a response
+        serializer = InterestSerializer(interest)
+
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+class InterestsReceivedView(generics.ListAPIView):
+    serializer_class = InterestSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        current_user = self.request.user
+        return Interest.objects.filter(receiver=current_user).order_by('-created_at')
+
+class InterestResponseView(generics.UpdateAPIView):
+    serializer_class = InterestSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_object(self):
+        sender_username = self.kwargs.get('sender')
+        receiver = self.request.user  # The current logged-in user is the receiver
+
+        try:
+            interest = Interest.objects.get(sender__username=sender_username, receiver=receiver)
+        except Interest.DoesNotExist:
+            raise NotFound(detail="Interest not found or you are not the receiver")
+
+        return interest
+
+    def patch(self, request, *args, **kwargs):
+        interest = self.get_object()
+
+        status_value = request.data.get('status')
+
+        # Check if the status is valid
+        if status_value not in dict(Interest.STATUS_CHOICES).keys():
+            return Response({"detail": "Invalid status"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Update the interest status
+        interest.status = status_value
+        interest.save()
+
+        # Return updated interest data as response
+        return Response(self.serializer_class(interest).data, status=status.HTTP_200_OK)

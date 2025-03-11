@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth.models import User
-from .models import Registration, Message
+from .models import Interest, Registration, Message
 
 class UserProfileRegistrationSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True)  # Required for registration
@@ -53,3 +53,8 @@ class MessageSerializer(serializers.ModelSerializer):
     class Meta:
         model = Message
         fields = ['sender', 'receiver', 'message', 'timestamp', 'sender_name', 'receiver_name']
+
+class InterestSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Interest
+        fields = ['sender', 'receiver', 'status','created_at']

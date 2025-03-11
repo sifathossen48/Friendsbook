@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.urls import path, include
-from user_management.views import ConversationView, JustJoinedUsersView, LoginView, LogoutView, MessageListView,PreferredEducationMatchView, PreferredLocationMatchView, SendMessageView, UserMessageListView,  UserProfileUpdateView, UserRegistrationView, UserProfileView, UsersByCountryView, UsersIMessagedView, country_list, MatchingUsersView
+from user_management.views import ConversationView, InterestResponseView, InterestsReceivedView, JustJoinedUsersView, LoginView, LogoutView, MessageListView,PreferredEducationMatchView, PreferredLocationMatchView, SendInterestView, SendMessageView, UserMessageListView,  UserProfileUpdateView, UserRegistrationView, UserProfileView, UsersByCountryView, UsersIMessagedView, country_list, MatchingUsersView
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
 urlpatterns = [
@@ -23,6 +23,9 @@ urlpatterns = [
     path('conversation/<str:username>/', ConversationView.as_view(), name='conversation'),
     path('users/messaged-me/', UserMessageListView.as_view(), name='users-messaged-me'),
     path('users/i-messaged/', UsersIMessagedView.as_view(), name='users-i-messaged'),
+    path('interest/send/<str:username>/', SendInterestView.as_view(), name='send_interest'),
+    path('interests/received/', InterestsReceivedView.as_view(), name='interests_received'),
+    path('interest/respond/<str:sender>/', InterestResponseView.as_view(), name='interest_respond'),
   
     # path('auth/', include('rest_framework.urls'))
 ]
